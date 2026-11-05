@@ -4,11 +4,19 @@ build-backend="setuptools.build_meta"
 
 [project]
 name="aether-research-studio"
-version="0.3.0"
+version="0.4.0"
 description="Checkpointed multi-agent research studio with observable concurrent evidence gathering."
 readme="README.md"
 requires-python=">=3.11"
-dependencies=["streamlit>=1.40,<2","plotly>=5.24,<7","openai>=1.60,<3","requests>=2.32,<3","python-dotenv>=1.0,<2"]
+dependencies=[
+  "streamlit>=1.40,<2",
+  "plotly>=5.24,<7",
+  "openai>=1.60,<3",
+  "google-genai>=1.0,<2",
+  "ddgs>=9.0,<10",
+  "requests>=2.32,<3",
+  "python-dotenv>=1.0,<2"
+]
 
 [project.optional-dependencies]
 dev=["pytest>=8,<10","ruff>=0.9,<1"]
