@@ -55,7 +55,7 @@ def agent_cards(statuses=None):
 
 
 def pipeline(active=""):
-    labels = ["Question", "Planning", "Research", "Critique", "Synthesis", "Validation", "Report"]
+    labels = ["Question", "Planning", "Research", "Critique", "Synthesis", "Validation", "Grounding", "Report"]
     active_index = labels.index(active) if active in labels else -1
     fig = go.Figure()
     fig.add_trace(
@@ -179,6 +179,7 @@ if launch:
                 "Fact & Bias Auditor": "Critique",
                 "Synthesis Writer": "Synthesis",
                 "Citation Validator": "Validation",
+                "Evidence Grounding Auditor": "Grounding",
             }
             progress_bar.progress(min(99, int(progress_for_event(event) * 100)))
             status_box.write(f"**{event['agent']}** · {event['message']}")
@@ -272,6 +273,7 @@ if result:
             "🧭 Research plan",
             "🛡 Critic review",
             "🔗 Citation audit",
+            "🧾 Evidence grounding",
             "⚡ Activity trace",
         ]
     )
@@ -316,6 +318,36 @@ if result:
         else:
             st.info("Demo mode contains fictional evidence; citation validation is not performed.")
     with tabs[5]:
+        grounding = result.get("grounding")
+        if not grounding:
+            st.info("Demo mode does not run claim-level grounding checks.")
+        elif grounding["status"] == "unavailable":
+            st.warning(grounding["error"])
+        elif grounding["status"] == "no_cited_claims":
+            st.info("No report lines with recognized source IDs were available to assess.")
+        else:
+            assessments = grounding["assessments"]
+            verdicts = ("supported", "partially_supported", "unsupported", "insufficient_evidence", "not_assessed")
+            counts = {
+                verdict: sum(item["verdict"] == verdict for item in assessments)
+                for verdict in verdicts
+            }
+            st.write("Claim-level review counts", counts)
+            for item in assessments:
+                st.markdown(f"**{item['claim_id']} · {item['verdict'].replace('_', ' ').title()}**")
+                st.write(item["claim"])
+                st.caption("Sources: " + ", ".join(item["source_ids"]))
+                if item["verdict"] == "supported":
+                    st.success(item["reason"])
+                elif item["verdict"] in {"partially_supported", "insufficient_evidence", "not_assessed"}:
+                    st.warning(item["reason"])
+                else:
+                    st.error(item["reason"])
+            st.caption(
+                "This is an LLM-based advisory review of retrieved snippets, not "
+                "independent verification or proof of factual correctness."
+            )
+    with tabs[6]:
         for event in result["events"]:
             st.caption(
                 f"{event['agent'].upper()} · {event.get('status', 'info').upper()}"
