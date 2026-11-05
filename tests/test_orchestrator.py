@@ -35,7 +35,9 @@ class FakeLLM:
             return "1. Landscape and key concepts\n2. Risks and limitations"
         if self.calls == 2:
             return "- Search snippets do not prove causation."
-        return "## Findings\nThe evidence suggests a cautious conclusion [S1]."
+        if self.calls == 3:
+            return "## Findings\nThe evidence suggests a cautious conclusion [S1]."
+        return '{"assessments":[{"claim_id":"C1","verdict":"supported","reason":"The test snippet supports this limited claim."}]}'
 
 
 def test_pipeline_emits_live_events_and_deduplicates_sources():
@@ -70,7 +72,9 @@ def test_pipeline_reports_unknown_and_uncited_citations():
                 return "1. Landscape and key concepts"
             if self.calls == 2:
                 return "- Need independent corroboration."
-            return "Claim [S1]. Unsupported reference [S99]."
+            if self.calls == 3:
+                return "Claim [S1]. Unsupported reference [S99]."
+            return '{"assessments":[{"claim_id":"C1","verdict":"partially_supported","reason":"The snippet offers limited support."}]}'
 
     result = ResearchOrchestrator(
         settings=object(),
