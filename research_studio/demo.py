@@ -4,9 +4,9 @@ def demo_result(topic:str,depth:str,audience:str)->dict:
     """Fictional preview data: deliberately not represented as factual research."""
     tracks=["Landscape and key concepts","Current approaches and capabilities","Limitations, risks and open questions","Practical implications"]
     sources=[
-      {"title":"Illustrative source card — research overview","url":"https://example.com/research-overview","snippet":"Placeholder evidence used to demonstrate the interface. This is not a real source.","domain":"example.com","quality":"DEMO · fictional"},
-      {"title":"Illustrative source card — technical perspective","url":"https://example.com/technical-perspective","snippet":"A sample card showing evidence snippets, provenance and links.","domain":"example.com","quality":"DEMO · fictional"},
-      {"title":"Illustrative source card — limitations","url":"https://example.com/limitations","snippet":"A placeholder showing how caveats and uncertainty appear alongside evidence.","domain":"example.com","quality":"DEMO · fictional"}]
+      {"id":"S1","title":"Illustrative source card — research overview","url":"https://example.com/research-overview","snippet":"Placeholder evidence used to demonstrate the interface. This is not a real source.","domain":"example.com","quality":"DEMO · fictional"},
+      {"id":"S2","title":"Illustrative source card — technical perspective","url":"https://example.com/technical-perspective","snippet":"A sample card showing evidence snippets, provenance and links.","domain":"example.com","quality":"DEMO · fictional"},
+      {"id":"S3","title":"Illustrative source card — limitations","url":"https://example.com/limitations","snippet":"A placeholder showing how caveats and uncertainty appear alongside evidence.","domain":"example.com","quality":"DEMO · fictional"}]
     audit=["Demo evidence is fictional; no factual conclusion can be drawn.","Live research should verify dates, primary sources and independent corroboration.","Generated summaries can omit context or misinterpret evidence."]
     report=f"""# Research brief: {topic}
 
