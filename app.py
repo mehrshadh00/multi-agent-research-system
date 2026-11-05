@@ -286,13 +286,11 @@ if result:
     with tabs[1]:
         for source in result["sources"]:
             source_id = source.get("id", "DEMO")
-            st.markdown(
-                f'<div class="evidence"><b>[{source_id}] {source["title"]}</b><br>'
-                f'<span class="small-muted">{source["domain"]} · {source["quality"]}</span><br>'
-                f'{source["snippet"]}<br>'
-                f'<a href="{source["url"]}" target="_blank">Open source ↗</a></div>',
-                unsafe_allow_html=True,
-            )
+            with st.container(border=True):
+                st.markdown(f"**[{source_id}] {source['title']}**")
+                st.caption(f"{source['domain']} · {source['quality']}")
+                st.write(source["snippet"])
+                st.link_button("Open source ↗", source["url"])
     with tabs[2]:
         for index, track in enumerate(result["tracks"], 1):
             st.markdown(f"**Track {index}: {track}**")
@@ -319,12 +317,10 @@ if result:
             st.info("Demo mode contains fictional evidence; citation validation is not performed.")
     with tabs[5]:
         for event in result["events"]:
-            st.markdown(
-                f'<div class="event"><div class="time">{event["agent"].upper()} · '
-                f'{event.get("status", "info").upper()}</div>'
-                f'<div>{event["message"]}</div></div>',
-                unsafe_allow_html=True,
+            st.caption(
+                f"{event['agent'].upper()} · {event.get('status', 'info').upper()}"
             )
+            st.write(event["message"])
     st.caption(
         "Search snippets are not full-page verification. Generated conclusions require "
         "human review; citation ID validation is not source-grounding verification."
