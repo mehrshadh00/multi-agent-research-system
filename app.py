@@ -61,7 +61,7 @@ def agent_cards(statuses=None):
         )
 
 
-def pipeline(active=""):
+def pipeline(active="", chart_key="aether_pipeline"):
     labels = ["Question", "Planning", "Research", "Critique", "Synthesis", "Validation", "Grounding", "Report"]
     active_index = labels.index(active) if active in labels else -1
     fig = go.Figure()
@@ -97,7 +97,12 @@ def pipeline(active=""):
         xaxis=dict(visible=False, range=[-0.3, len(labels) - 0.7]),
         yaxis=dict(visible=False, range=[-0.4, 0.4]),
     )
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displayModeBar": False},
+        key=chart_key,
+    )
 
 
 def progress_for_event(event):
@@ -280,7 +285,10 @@ if launch or resume_request:
             with live_agents.container():
                 agent_cards(agent_statuses)
             with live_pipeline.container():
-                pipeline(stage_map.get(event["agent"], ""))
+                pipeline(
+                    stage_map.get(event["agent"], ""),
+                    chart_key=f"aether_pipeline_event_{len(trace_events)}",
+                )
             with live_trace.container():
                 st.markdown("**Live event stream**")
                 for item in trace_events[-10:]:
