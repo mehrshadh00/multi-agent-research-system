@@ -4,13 +4,13 @@
 
 ## Current workflow
 1. **Research Director** plans 4–6 focused research tracks.
-2. **Evidence Researcher** searches each track separately, streams progress events, deduplicates URLs, and assigns stable source IDs.
+2. **Evidence Researcher** searches tracks concurrently (up to four workers), deduplicates URLs, and assigns stable source IDs.
 3. **Fact & Bias Auditor** reviews the collected search snippets for gaps, limitations, potential bias, and contradictions.
 4. **Synthesis Writer** drafts a structured report using the supplied evidence and source IDs.
 5. **Citation Validator** checks whether report citation IDs exist in the retrieved source register and flags uncited sources.
 6. **Evidence Grounding Auditor** performs an advisory, claim-level review of cited report lines against the associated search snippets.
 
-The Streamlit dashboard displays agent state changes and activity events while the live workflow is running. Each stage has an explicit profile describing its role, objective, expected inputs, outputs, and tools. The persisted trace stores bounded input/output snapshots so a run can be inspected after completion. Independent Tavily searches are dispatched concurrently (up to four workers); results are collected in track order to keep source IDs deterministic.
+The Streamlit dashboard displays agent state changes and activity events while the live workflow is running. Completed missions can be reopened from the recent history panel, and the complete run result plus execution trace can be exported as JSON. Each stage has an explicit profile describing its role, objective, expected inputs, outputs, and tools. The persisted trace stores bounded input/output snapshots so a run can be inspected after completion. Independent Tavily searches are dispatched concurrently (up to four workers); results are collected in track order to keep source IDs deterministic.
 
 ## Important architectural distinction
 The current release is a **sequential, role-based multi-agent workflow**. The roles use a shared LLM provider with different instructions; they are not independent concurrent agents, and the critic is not a formal verification system. This keeps the execution trace understandable while the workflow is being hardened.
@@ -46,6 +46,28 @@ TAVILY_API_KEY = "..."
 ```
 Never commit secrets. `OPENAI_MODEL` optionally overrides the default `gpt-4.1-mini`.
 
+## Run with Docker
+
+The container exposes Streamlit on port 8501 and includes a health check. Docker Compose also mounts a named volume so SQLite checkpoints survive container recreation.
+
+```bash
+# Optional: export your provider keys before starting
+export OPENAI_API_KEY="..."
+export TAVILY_API_KEY="..."
+docker compose up --build -d
+```
+
+Open http://localhost:8501. To stop the app, run `docker compose down`. The named `aether_data` volume is retained; add `-v` only if you intentionally want to delete saved missions.
+
+## Deploy on Streamlit Community Cloud
+
+1. Create a new app from this repository.
+2. Select branch `main` and main file `app.py`.
+3. Add `OPENAI_API_KEY` and `TAVILY_API_KEY` in the app's Secrets settings.
+4. Deploy and open the generated app URL.
+
+**Persistence note:** Streamlit Community Cloud local storage is not a durable database. Saved run history may disappear when the app container is recycled. Use Docker with a persistent volume or move `SQLiteRunStore` to a managed database for durable production history.
+
 ## Development checks
 ```bash
 ruff check .
@@ -62,9 +84,5 @@ Tests use fake providers for deterministic orchestration checks; they do not con
 - Search coverage can be incomplete; human verification remains necessary.
 - API usage may incur provider charges.
 
-## Engineering roadmap
-- Stronger claim segmentation and independently corroborated evidence checks.
-- Provider-specific retry/backoff policies, structured model outputs, and distributed execution beyond concurrent search tracks.
-- Persistent run history across deployments and interactive trace replay.
-- Independent per-agent model/provider configuration and optional LangGraph state machine.
-- Contradiction detection, richer source quality signals, and PDF/DOCX export.
+## Release scope and next steps
+The current portfolio release includes the six-stage research workflow, concurrent search tracks, agent I/O trace, SQLite checkpoints, failed-stage recovery, completed-run history, JSON export, deterministic tests, and Docker packaging. The remaining production extensions are external durable storage, provider-level retry/backoff and rate limiting, independent model selection per agent, and stronger source corroboration. These are intentionally documented as future work rather than implied capabilities.
