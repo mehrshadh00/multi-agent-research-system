@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 
-from .providers import LLMProvider
+from .providers import LLMBackend
 
 VERDICTS = {"supported", "partially_supported", "unsupported", "insufficient_evidence"}
 
@@ -27,7 +27,7 @@ def _cited_claims(report: str, sources: list[dict]) -> list[dict]:
     return claims
 
 
-def audit_claim_grounding(report: str, sources: list[dict], llm: LLMProvider) -> dict:
+def audit_claim_grounding(report: str, sources: list[dict], llm: LLMBackend) -> dict:
     """Ask a separate critic pass whether cited snippets support report claims.
 
     This is an advisory model review, not proof of factual correctness.
