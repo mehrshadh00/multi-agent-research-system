@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import json
 import re
 import time
 
@@ -10,7 +9,6 @@ import streamlit as st
 
 from research_studio.config import settings
 from research_studio.demo import demo_result
-from research_studio.history import result_from_state
 from research_studio.history import result_from_state
 from research_studio.orchestrator import ResearchOrchestrator, ResearchStageError
 from research_studio.state import STAGE_LABELS, STAGE_ORDER
@@ -200,33 +198,6 @@ with st.sidebar:
                     st.session_state["aether_audience"] = saved["inputs"]["audience"]
                     st.session_state["aether_mode"] = "Live Research"
                     st.rerun()
-    completed_runs = [
-        run for run in run_store.list_runs()
-        if run["status"] == "completed"
-    ]
-    if completed_runs:
-        st.divider()
-        st.markdown("**Recent mission history**")
-        completed_ids = [""] + [run["run_id"] for run in completed_runs]
-        selected_completed = st.selectbox(
-            "Load a completed mission",
-            completed_ids,
-            key="aether_history_selection",
-            format_func=lambda run_id: (
-                "Choose a saved report…" if not run_id else
-                next(
-                    (
-                        f"{run['topic'][:38]} · {run['run_id'][:7]}"
-                        for run in completed_runs if run["run_id"] == run_id
-                    ),
-                    run_id,
-                )
-            ),
-        )
-        if selected_completed and st.button(
-            "Open saved report", use_container_width=True, key="open_saved_mission"
-        ):
-            load_completed_run(selected_completed)
     completed_runs = [
         run for run in run_store.list_runs()
         if run["status"] == "completed"
