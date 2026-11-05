@@ -107,7 +107,7 @@ def progress_for_event(event):
         match = re.search(r"Track (\d+) returned", message)
         if match:
             current, total = int(match.group(1)), max(
-                1, len(st.session_state.get("aether_tracks", []))
+                1, st.session_state.get("aether_track_total", 1)
             )
             return 0.2 + 0.4 * current / total
         return 0.2 if status == "running" else 0.62
@@ -160,6 +160,7 @@ if launch:
     ):
         st.error("Live Research requires OPENAI_API_KEY and TAVILY_API_KEY.")
     else:
+        st.session_state["aether_track_total"] = 1
         status_box = st.status("Initializing research mission…", expanded=True)
         progress_bar = st.progress(0)
         agent_statuses = {name: "Standby" for _, name, _ in AGENTS}
