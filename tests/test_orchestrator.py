@@ -119,14 +119,14 @@ def test_failed_stage_can_resume_without_repeating_completed_work(tmp_path):
         def complete(self, system, user):
             self.calls += 1
             if "rigorous research planner" in system:
-                return "1. Landscape and key concepts\\n2. Risks and limitations"
+                return "1. Landscape and key concepts\n2. Risks and limitations"
             if "skeptical research auditor" in system:
                 if self.fail_audit_once:
                     self.fail_audit_once = False
                     raise TimeoutError("temporary provider timeout")
                 return "- Evidence is limited."
             if "careful research analyst" in system:
-                return "## Findings\\nA cautious conclusion [S1]."
+                return "## Findings\nA cautious conclusion [S1]."
             return (
                 '{"assessments":[{"claim_id":"C1","verdict":"supported",'
                 '"reason":"The snippet supports this limited statement."}]}'
@@ -210,11 +210,11 @@ def test_research_tracks_execute_concurrently_and_trace_io_contracts(tmp_path):
         def complete(self, system, user):
             self.calls += 1
             if "rigorous research planner" in system:
-                return "1. Landscape and key concepts\\n2. Risks and limitations"
+                return "1. Landscape and key concepts\n2. Risks and limitations"
             if "skeptical research auditor" in system:
                 return "- More corroboration is needed."
             if "careful research analyst" in system:
-                return "## Findings\\nA limited conclusion [S1]."
+                return "## Findings\nA limited conclusion [S1]."
             return '{"assessments":[]}'
 
     result = ResearchOrchestrator(
