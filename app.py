@@ -142,18 +142,6 @@ def load_completed_run(run_id: str) -> None:
     st.rerun()
 
 
-def load_completed_run(run_id: str) -> None:
-    saved = run_store.load(run_id)
-    if saved is None:
-        st.error("Saved mission could not be found.")
-        return
-    try:
-        st.session_state["aether_result"] = result_from_state(saved)
-    except ValueError as exc:
-        st.error(str(exc))
-        return
-    st.rerun()
-
 with st.sidebar:
     st.markdown("## ✳ AETHER")
     st.caption("MULTI-AGENT RESEARCH STUDIO")
