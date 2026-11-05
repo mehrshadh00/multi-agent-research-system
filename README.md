@@ -21,7 +21,7 @@ Each live run is saved to a local SQLite database at `.aether_data/aether.sqlite
 The six checkpointed stages are planning, research, audit, synthesis, citation validation, and evidence grounding. Attempt counts, timestamps, errors, input/output previews, agent profile metadata, and run events are stored with each run. The store is local to the app filesystem; on ephemeral hosting such as a restarted Streamlit Community Cloud container, local SQLite data may be lost. Use a persistent volume or managed database before relying on long-term run history.
 
 ## Architecture
-`Streamlit UI → ResearchOrchestrator → Planner → Track-by-track Tavily Search → Critic → Writer → Citation ID Validator → Claim Grounding Auditor`
+`Streamlit UI → ResearchOrchestrator → Planner → Concurrent Tavily Track Search → Critic → Writer → Citation ID Validator → Claim Grounding Auditor`
 
 Provider adapters live in `research_studio/providers.py`. The orchestrator accepts injectable search and LLM providers so its behavior can be tested without network access or API credentials.
 
