@@ -165,7 +165,8 @@ class ResearchOrchestrator:
             "sources": sources,
             "audit": findings,
             "citation_audit": citation_audit,
-            "grounding": grounding,\n            "citation_stats": {
+            "grounding": grounding,
+            "citation_stats": {
                 "known_sources": len(known_ids),
                 "cited_sources": len(cited_ids & known_ids),
                 "unknown_ids": unknown_ids,
