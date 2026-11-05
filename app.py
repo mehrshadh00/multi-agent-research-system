@@ -1,5 +1,6 @@
 from __future__ import annotations
 import time
+from html import escape
 import plotly.graph_objects as go
 import streamlit as st
 from research_studio.config import settings
@@ -46,6 +47,33 @@ def pipeline(active=""):
     fig.update_layout(height=140,margin=dict(l=10,r=10,t=10,b=30),showlegend=False,paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",xaxis=dict(visible=False,range=[-.3,5.3]),yaxis=dict(visible=False,range=[-.4,.4]))
     st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
 
+def research_map(result):
+    """Visualize the four-agent workflow and its collected evidence."""
+    sources = result["sources"][:12]
+    xs = [0, 1.4, 2.8, 4.2]
+    ys = [0, 0, 0, 0]
+    labels = ["Research Director", "Evidence Researcher", "Fact & Bias Auditor", "Synthesis Writer"]
+    kinds = ["agent"] * 4
+    edges = [(0, 1), (1, 2), (2, 3)]
+    for index, source in enumerate(sources):
+        node = len(xs)
+        xs.append(1.4 + ((index % 3) - 1) * 0.32)
+        ys.append(-1.0 - (index // 3) * 0.72)
+        labels.append(f"S{index + 1} · {source['domain']}")
+        kinds.append("source")
+        edges.extend([(1, node), (node, 2)])
+    edge_x, edge_y = [], []
+    for start, end in edges:
+        edge_x.extend([xs[start], xs[end], None])
+        edge_y.extend([ys[start], ys[end], None])
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines", line=dict(width=1.5, color="#3c5873"), hoverinfo="skip", showlegend=False))
+    custom = ["Agent"] * 4 + [source["title"] for source in sources]
+    fig.add_trace(go.Scatter(x=xs, y=ys, mode="markers+text", text=labels, textposition="bottom center", marker=dict(size=[28 if kind == "agent" else 17 for kind in kinds], color=["#62e6dc" if kind == "agent" else "#7d8df5" for kind in kinds], line=dict(color="#dce8f7", width=1)), textfont=dict(color="#dce8f7", size=10), customdata=custom, hovertemplate="%{text}<br>%{customdata}<extra></extra>", showlegend=False))
+    fig.update_layout(height=max(360, 250 + len(sources) // 3 * 90), margin=dict(l=15, r=15, t=25, b=65), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(visible=False, range=[-0.6, 4.8]), yaxis=dict(visible=False), title=dict(text="AGENT COLLABORATION / EVIDENCE FLOW", font=dict(size=12, color="#91a0b5")))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.caption("The researcher routes collected sources to the auditor, then the writer synthesizes reviewed evidence.")
+
 with st.sidebar:
     st.markdown("## ✳ AETHER");st.caption("MULTI-AGENT RESEARCH STUDIO")
     mode=st.radio("Execution mode",["Guided Demo","Live Research"])
@@ -76,7 +104,11 @@ if launch:
             result=demo_result(topic,depth,audience);bar.progress(100);status.update(label="Demo mission complete",state="complete",expanded=False)
         else:
             try:
-                result=ResearchOrchestrator(settings).run(topic.strip(),depth,audience)
+                progress_by_agent = {"Research Director": 15, "Evidence Researcher": 45, "Fact & Bias Auditor": 72, "Synthesis Writer": 90}
+                def on_event(event):
+                    status.write(f"**{event['agent']}** — {event['message']}")
+                    bar.progress(progress_by_agent.get(event["agent"], 50))
+                result=ResearchOrchestrator(settings).run(topic.strip(),depth,audience,on_event=on_event)
                 bar.progress(100);status.update(label="Research mission complete",state="complete",expanded=False)
             except (RuntimeError,ValueError) as exc:
                 status.update(label="Mission failed",state="error");st.error(str(exc));result=None
@@ -89,12 +121,19 @@ if result:
     for col,label,value in zip(cols,["SOURCES REVIEWED","RESEARCH TRACKS","AUDIT FINDINGS","EXECUTION"],[len(result["sources"]),len(result["tracks"]),len(result["audit"]),result["mode"].upper()]):
         col.markdown(f'<div class="metric"><div class="label">{label}</div><div class="value">{value}</div></div>',unsafe_allow_html=True)
     st.markdown("### Agent activity");agent_cards({name:"Complete" for _,name,_ in AGENTS})
-    report_tab,evidence_tab,plan_tab,audit_tab,trace_tab=st.tabs(["📄 Final report","🔎 Evidence room","🧭 Research plan","🛡 Critic review","⚡ Activity trace"])
+    report_tab,map_tab,evidence_tab,plan_tab,audit_tab,trace_tab=st.tabs(["📄 Final report","🕸 Research map","🔎 Evidence room","🧭 Research plan","🛡 Critic review","⚡ Activity trace"])
     with report_tab:
         st.markdown(result["report"]);st.download_button("Download report · Markdown",result["report"],"aether-research-report.md","text/markdown")
+    with map_tab:
+        research_map(result)
     with evidence_tab:
         for src in result["sources"]:
-            st.markdown(f'<div class="evidence"><b>{src["title"]}</b><br><span class="small-muted">{src["domain"]} · {src["quality"]}</span><br>{src["snippet"]}<br><a href="{src["url"]}" target="_blank">Open source ↗</a></div>',unsafe_allow_html=True)
+            title = escape(src["title"])
+            domain = escape(src["domain"])
+            quality = escape(src["quality"])
+            snippet = escape(src["snippet"])
+            url = escape(src["url"], quote=True)
+            st.markdown(f'<div class="evidence"><b>{title}</b><br><span class="small-muted">{domain} · {quality}</span><br>{snippet}<br><a href="{url}" target="_blank" rel="noopener noreferrer">Open source ↗</a></div>',unsafe_allow_html=True)
     with plan_tab:
         for i,track in enumerate(result["tracks"],1): st.markdown(f"**Track {i}: {track}**")
     with audit_tab:

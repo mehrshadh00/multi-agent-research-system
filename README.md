@@ -7,7 +7,7 @@
 - Evidence Researcher: searches the web and collects source snippets.
 - Fact & Bias Auditor: identifies gaps, unsupported claims and source limitations.
 - Synthesis Writer: creates a structured Markdown report with source IDs.
-- Streamlit dashboard: workflow map, agent cards, evidence room, audit findings, activity trace and downloadable report.
+- Streamlit dashboard: live agent event stream, interactive agent-to-evidence collaboration map, agent cards, evidence room, audit findings, activity trace and downloadable report.
 - Guided Demo: explores the UI without API keys. All sample sources are explicitly fictional.
 
 ## Architecture
