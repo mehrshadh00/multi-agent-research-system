@@ -1,4 +1,4 @@
-from research_studio.orchestrator import ResearchOrchestrator
+from threading import Barrier\n\nfrom research_studio.agents import AGENT_PROFILES, profile_for\nfrom research_studio.orchestrator import ResearchOrchestrator
 from research_studio.store import SQLiteRunStore
 
 
@@ -170,3 +170,75 @@ def test_failed_stage_can_resume_without_repeating_completed_work(tmp_path):
     assert result["stages"]["synthesis"]["status"] == "completed"
     assert llm.calls == 5
     assert any("Restored completed checkpoint" in e["message"] for e in result["events"])
+
+
+
+def test_agent_profiles_define_explicit_input_and_output_contracts():
+    assert len(AGENT_PROFILES) == 6
+    for stage, profile in AGENT_PROFILES.items():
+        assert profile.stage == stage
+        assert profile.name
+        assert profile.expected_inputs
+        assert profile.outputs
+        assert profile.public_dict()["tools"] is not None
+
+    try:
+        profile_for("unknown")
+    except ValueError as exc:
+        assert "Unknown agent stage" in str(exc)
+    else:
+        raise AssertionError("Unknown agent stages must be rejected.")
+
+
+def test_research_tracks_execute_concurrently_and_trace_io_contracts(tmp_path):
+    barrier = Barrier(2)
+
+    class ParallelSearch:
+        def search(self, query, max_results=3):
+            barrier.wait(timeout=2)
+            slug = "landscape" if "Landscape" in query else "risks"
+            return [{
+                "title": f"Source for {slug}",
+                "url": f"https://example.org/{slug}",
+                "content": f"Evidence about {slug}.",
+            }]
+
+    class ParallelLLM:
+        def __init__(self):
+            self.calls = 0
+
+        def complete(self, system, user):
+            self.calls += 1
+            if "rigorous research planner" in system:
+                return "1. Landscape and key concepts\\n2. Risks and limitations"
+            if "skeptical research auditor" in system:
+                return "- More corroboration is needed."
+            if "careful research analyst" in system:
+                return "## Findings\\nA limited conclusion [S1]."
+            return '{"assessments":[]}'
+
+    result = ResearchOrchestrator(
+        settings=object(),
+        search_provider=ParallelSearch(),
+        llm_provider=ParallelLLM(),
+        store=SQLiteRunStore(tmp_path / "parallel.sqlite3"),
+    ).run("AI research", "Standard", "Researchers")
+
+    assert len(result["sources"]) == 2
+    assert [source["id"] for source in result["sources"]] == ["S1", "S2"]
+    dispatch_events = [
+        event for event in result["events"]
+        if event["stage"] == "research" and event["message"].startswith("Dispatching")
+    ]
+    assert len(dispatch_events) == 2
+    start_event = next(
+        event for event in result["events"]
+        if event["stage"] == "planning" and event["status"] == "running"
+    )
+    complete_event = next(
+        event for event in result["events"]
+        if event["stage"] == "planning" and event["status"] == "complete"
+    )
+    assert start_event["profile"]["name"] == "Research Director"
+    assert '"topic": "AI research"' in start_event["input_preview"]
+    assert '"tracks"' in complete_event["output_preview"]
