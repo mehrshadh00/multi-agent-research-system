@@ -1,4 +1,7 @@
-from threading import Barrier\n\nfrom research_studio.agents import AGENT_PROFILES, profile_for\nfrom research_studio.orchestrator import ResearchOrchestrator
+from threading import Barrier
+
+from research_studio.agents import AGENT_PROFILES, profile_for
+from research_studio.orchestrator import ResearchOrchestrator
 from research_studio.store import SQLiteRunStore
 
 
