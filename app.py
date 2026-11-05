@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from dataclasses import replace
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -219,12 +220,25 @@ with st.sidebar:
         ):
             load_completed_run(selected_completed)
     st.divider()
+    st.markdown("**Live provider**")
+    provider_options = ["gemini", "openai"]
+    provider_index = provider_options.index(settings.llm_provider) if settings.llm_provider in provider_options else 0
+    selected_provider = st.selectbox(
+        "Language model",
+        provider_options,
+        index=provider_index,
+        format_func=lambda value: "Gemini · free tier" if value == "gemini" else "OpenAI · paid API",
+    )
+    active_settings = replace(settings, llm_provider=selected_provider)
     st.markdown("**System readiness**")
-    st.write("OpenAI · " + ("🟢 configured" if settings.openai_api_key else "⚪ missing"))
-    st.write("Tavily · " + ("🟢 configured" if settings.tavily_api_key else "⚪ missing"))
-    st.caption("Live mode requires both keys. Demo uses fictional placeholder evidence.")
+    st.write("Gemini · " + ("🟢 configured" if settings.gemini_api_key else "⚪ add free key"))
+    st.write("DuckDuckGo Search · 🟢 no API key")
+    st.write("Tavily Search · " + ("🟢 optional key found" if settings.tavily_api_key else "⚪ using free DuckDuckGo"))
+    if selected_provider == "openai":
+        st.write("OpenAI · " + ("🟢 configured" if settings.openai_api_key else "⚪ missing"))
+    st.caption("Free setup: Gemini API key only. Search uses DuckDuckGo automatically.")
     st.divider()
-    st.caption("AETHER / v0.3.0")
+    st.caption("AETHER / v0.4.0")
 
 left, right = st.columns([2.4, 1])
 with left:
@@ -255,10 +269,9 @@ if launch or resume_request:
     st.session_state.pop("aether_result", None)
     if not topic.strip():
         st.warning("Enter a research question.")
-    elif mode == "Live Research" and (
-        not settings.openai_api_key or not settings.tavily_api_key
-    ):
-        st.error("Live Research requires OPENAI_API_KEY and TAVILY_API_KEY.")
+    elif mode == "Live Research" and not active_settings.active_llm_api_key:
+        required_key = "GEMINI_API_KEY" if selected_provider == "gemini" else "OPENAI_API_KEY"
+        st.error(f"Live Research needs {required_key}. DuckDuckGo search is already configured without a key.")
     else:
         st.session_state["aether_track_total"] = 1
         status_box = st.status("Initializing research mission…", expanded=True)
@@ -332,7 +345,7 @@ if launch or resume_request:
             result["events"] = trace_events
         else:
             try:
-                result = ResearchOrchestrator(settings, store=run_store).run(
+                result = ResearchOrchestrator(active_settings, store=run_store).run(
                     topic.strip(),
                     depth,
                     audience,
