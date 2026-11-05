@@ -103,6 +103,7 @@ def progress_for_event(event):
         match = re.search(r"track (\d+)/(\d+)", message, re.IGNORECASE)
         if match:
             current, total = map(int, match.groups())
+            st.session_state["aether_track_total"] = total
             return 0.2 + 0.4 * (current - 1) / max(total, 1)
         match = re.search(r"Track (\d+) returned", message)
         if match:
