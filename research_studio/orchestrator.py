@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Callable
 from urllib.parse import urlparse
 
+from .grounding import audit_claim_grounding
 from .providers import LLMProvider, SearchProvider
 
 Event = dict[str, str]
@@ -148,12 +149,23 @@ class ResearchOrchestrator:
             "warning" if citation_audit else "complete",
         )
 
+        emit("Evidence Grounding Auditor", "Checking cited claims against their source snippets.", "running")
+        grounding = audit_claim_grounding(report, sources, self.llm)
+        grounding_status = grounding["status"]
+        grounding_count = len(grounding["assessments"])
+        emit(
+            "Evidence Grounding Auditor",
+            f"Grounding review {grounding_status}: assessed {grounding_count} cited claims.",
+            "warning" if grounding_status in {"partial", "unavailable"} else "complete",
+        )
+
         return {
             "topic": topic,
             "tracks": tracks,
             "sources": sources,
             "audit": findings,
             "citation_audit": citation_audit,
+            "grounding": grounding,
             "citation_stats": {
                 "known_sources": len(known_ids),
                 "cited_sources": len(cited_ids & known_ids),
