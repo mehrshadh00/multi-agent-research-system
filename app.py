@@ -37,16 +37,19 @@ st.markdown(
 
 AGENTS = [
     ("01 / PLANNER", "Research Director", "Breaks the question into focused research tracks."),
-    ("02 / SCOUT", "Evidence Researcher", "Finds sources and extracts evidence."),
+    ("02 / SCOUT", "Evidence Researcher", "Runs concurrent searches and builds the evidence register."),
     ("03 / CRITIC", "Fact & Bias Auditor", "Challenges claims, gaps and source limitations."),
     ("04 / AUTHOR", "Synthesis Writer", "Builds a structured report from reviewed evidence."),
+    ("05 / VALIDATOR", "Citation Validator", "Checks citation IDs against the source register."),
+    ("06 / GROUNDER", "Evidence Grounding Auditor", "Assesses cited claims against retrieved snippets."),
 ]
 
 
 def agent_cards(statuses=None):
     statuses = statuses or {}
-    cols = st.columns(4)
-    for col, (role, name, desc) in zip(cols, AGENTS):
+    cols = st.columns(3)
+    for index, (role, name, desc) in enumerate(AGENTS):
+        col = cols[index % 3]
         state = statuses.get(name, "Standby")
         col.markdown(
             f'<div class="agent"><div class="role">{role}</div>'
@@ -173,7 +176,7 @@ with st.sidebar:
     st.write("Tavily · " + ("🟢 configured" if settings.tavily_api_key else "⚪ missing"))
     st.caption("Live mode requires both keys. Demo uses fictional placeholder evidence.")
     st.divider()
-    st.caption("AETHER / v0.2.0")
+    st.caption("AETHER / v0.3.0")
 
 left, right = st.columns([2.4, 1])
 with left:
@@ -241,6 +244,12 @@ if launch or resume_request:
                         f"{item['timestamp']} · {item['agent']} · {item['status'].upper()}"
                     )
                     st.write(item["message"])
+                    if item.get("input_preview"):
+                        st.caption("INPUT")
+                        st.code(item["input_preview"], language="json")
+                    if item.get("output_preview"):
+                        st.caption("OUTPUT")
+                        st.code(item["output_preview"], language="json")
 
         if mode == "Guided Demo":
             demo_steps = [
@@ -415,11 +424,24 @@ if result:
                 "independent verification or proof of factual correctness."
             )
     with tabs[6]:
-        for event in result["events"]:
-            st.caption(
-                f"{event['agent'].upper()} · {event.get('status', 'info').upper()}"
+        for index, event in enumerate(result["events"], start=1):
+            label = (
+                f"{index:03d} · {event['agent']} · "
+                f"{event.get('status', 'info').upper()}"
             )
-            st.write(event["message"])
+            with st.expander(label):
+                st.write(event["message"])
+                profile = event.get("profile", {})
+                if profile.get("objective"):
+                    st.caption(profile["objective"])
+                if profile.get("tools"):
+                    st.caption("Tools: " + ", ".join(profile["tools"]))
+                if event.get("input_preview"):
+                    st.markdown("**Input snapshot**")
+                    st.code(event["input_preview"], language="json")
+                if event.get("output_preview"):
+                    st.markdown("**Output snapshot**")
+                    st.code(event["output_preview"], language="json")
     st.caption(
         "Search snippets are not full-page verification. The grounding audit is advisory, "
         "not independent verification; human review remains essential."

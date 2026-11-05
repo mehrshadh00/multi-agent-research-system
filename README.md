@@ -10,7 +10,7 @@
 5. **Citation Validator** checks whether report citation IDs exist in the retrieved source register and flags uncited sources.
 6. **Evidence Grounding Auditor** performs an advisory, claim-level review of cited report lines against the associated search snippets.
 
-The Streamlit dashboard displays agent state changes and activity events while the live workflow is running. The orchestration callback is UI-agnostic and can later feed a CLI, websocket, or persisted event log.
+The Streamlit dashboard displays agent state changes and activity events while the live workflow is running. Each stage has an explicit profile describing its role, objective, expected inputs, outputs, and tools. The persisted trace stores bounded input/output snapshots so a run can be inspected after completion. Independent Tavily searches are dispatched concurrently (up to four workers); results are collected in track order to keep source IDs deterministic.
 
 ## Important architectural distinction
 The current release is a **sequential, role-based multi-agent workflow**. The roles use a shared LLM provider with different instructions; they are not independent concurrent agents, and the critic is not a formal verification system. This keeps the execution trace understandable while the workflow is being hardened.
@@ -18,7 +18,7 @@ The current release is a **sequential, role-based multi-agent workflow**. The ro
 ## Checkpointed execution (v0.3)
 Each live run is saved to a local SQLite database at `.aether_data/aether.sqlite3`. Every stage transition and successful stage output is committed as a checkpoint. If a provider fails, the run is marked failed and the dashboard offers a **Resume from failed stage** action. Completed earlier stages are restored from SQLite and are not called again; the selected failed stage and all downstream stages are rerun.
 
-The six checkpointed stages are planning, research, audit, synthesis, citation validation, and evidence grounding. Attempt counts, timestamps, errors, and run events are stored with each run. The store is local to the app filesystem; on ephemeral hosting such as a restarted Streamlit Community Cloud container, local SQLite data may be lost. Use a persistent volume or managed database before relying on long-term run history.
+The six checkpointed stages are planning, research, audit, synthesis, citation validation, and evidence grounding. Attempt counts, timestamps, errors, input/output previews, agent profile metadata, and run events are stored with each run. The store is local to the app filesystem; on ephemeral hosting such as a restarted Streamlit Community Cloud container, local SQLite data may be lost. Use a persistent volume or managed database before relying on long-term run history.
 
 ## Architecture
 `Streamlit UI → ResearchOrchestrator → Planner → Track-by-track Tavily Search → Critic → Writer → Citation ID Validator → Claim Grounding Auditor`
@@ -64,7 +64,7 @@ Tests use fake providers for deterministic orchestration checks; they do not con
 
 ## Engineering roadmap
 - Stronger claim segmentation and independently corroborated evidence checks.
-- Distributed task execution, provider-specific retry/backoff policies, and structured outputs.
+- Provider-specific retry/backoff policies, structured model outputs, and distributed execution beyond concurrent search tracks.
 - Persistent run history across deployments and interactive trace replay.
-- Independent agent configuration and optional LangGraph state machine.
+- Independent per-agent model/provider configuration and optional LangGraph state machine.
 - Contradiction detection, richer source quality signals, and PDF/DOCX export.

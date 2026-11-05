@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import re
+import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Callable
 from urllib.parse import urlparse
 
+from .agents import profile_for
 from .grounding import audit_claim_grounding
 from .providers import LLMProvider, SearchProvider
 from .state import STAGE_LABELS, new_run_state, reset_from
@@ -61,17 +64,22 @@ class ResearchOrchestrator:
             event = {
                 "stage": stage,
                 "agent": STAGE_LABELS[stage],
+                "profile": profile_for(stage).public_dict(),
                 "message": message,
                 "status": status,
                 "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
+            event.update(getattr(emit, "payload", {}))
+            if hasattr(emit, "payload"):
+                del emit.payload
             state["events"].append(event)
             self.store.save(state)
             if on_event:
                 on_event(event)
 
-        def execute(stage: str, operation):
+        def execute(stage: str, operation, input_data: dict):
             stage_state = state["stages"][stage]
+            input_preview = self._preview(input_data)
             if stage_state["status"] == "completed":
                 emit(stage, "Restored completed checkpoint; skipped execution.", "skipped")
                 return state["artifacts"][stage]
@@ -82,6 +90,7 @@ class ResearchOrchestrator:
             stage_state["finished_at"] = None
             stage_state["error"] = None
             self.store.save(state)
+            emit.payload = {"input_preview": input_preview}
             emit(stage, f"Starting attempt {stage_state['attempts']}.", "running")
             try:
                 output = operation()
@@ -89,6 +98,7 @@ class ResearchOrchestrator:
                 stage_state["status"] = "completed"
                 stage_state["finished_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
                 self.store.save(state)
+                emit.payload = {"output_preview": self._preview(output)}
                 emit(stage, "Stage checkpoint committed.", "complete")
                 return output
             except Exception as exc:
@@ -103,21 +113,38 @@ class ResearchOrchestrator:
                 ) from exc
 
         try:
-            planning = execute("planning", self._plan(topic, depth, emit))
+            planning = execute(
+                "planning", self._plan(topic, depth, emit),
+                {"topic": topic, "research_depth": depth},
+            )
             tracks = planning["tracks"]
-            sources = execute("research", self._research(topic, tracks, emit))
-            audit = execute("audit", self._audit(topic, sources, emit))
+            sources = execute(
+                "research", self._research(topic, tracks, emit),
+                {"topic": topic, "tracks": tracks},
+            )
+            audit = execute(
+                "audit", self._audit(topic, sources, emit),
+                {"topic": topic, "sources": self._source_manifest(sources)},
+            )
             report = execute(
                 "synthesis",
-                self._synthesize(
-                    topic, audience, planning["plan"], sources, audit, emit
-                ),
+                self._synthesize(topic, audience, planning["plan"], sources, audit, emit),
+                {
+                    "topic": topic, "audience": audience,
+                    "plan": planning["plan"],
+                    "source_ids": [source["id"] for source in sources],
+                    "audit_findings": audit["findings"],
+                },
             )
             citation = execute(
                 "citation_validation",
                 self._validate_citations(report, sources, emit),
+                {"report_excerpt": report[:1200], "source_ids": [s["id"] for s in sources]},
             )
-            grounding = execute("grounding", self._ground(report, sources, emit))
+            grounding = execute(
+                "grounding", self._ground(report, sources, emit),
+                {"report_excerpt": report[:1200], "source_ids": [s["id"] for s in sources]},
+            )
         except ResearchStageError:
             raise
 
@@ -158,34 +185,51 @@ class ResearchOrchestrator:
 
     def _research(self, topic: str, tracks: list[str], emit):
         def operation():
-            sources = []
-            seen = set()
-            for index, track in enumerate(tracks, start=1):
-                emit("research", f"Searching track {index}/{len(tracks)}: {track}", "running")
-                results = self.search.search(f"{topic} {track}", max_results=3)
-                added = 0
-                for item in results:
-                    url = item.get("url", "").strip()
-                    if not url or url in seen:
-                        continue
-                    seen.add(url)
-                    domain = urlparse(url).netloc
-                    sources.append(
-                        {
-                            "id": f"S{len(sources) + 1}",
-                            "title": item.get("title") or domain or "Untitled source",
-                            "url": url,
-                            "snippet": item.get("content", "")[:1200],
-                            "domain": domain,
-                            "quality": "Search result · verify before citation",
-                        }
+            # Search requests are independent. Dispatch concurrently, then consume
+            # futures in track order so source IDs and traces remain deterministic.
+            workers = min(4, max(1, len(tracks)))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = []
+                for index, track in enumerate(tracks, start=1):
+                    emit(
+                        "research",
+                        f"Dispatching track {index}/{len(tracks)}: {track}",
+                        "running",
                     )
-                    added += 1
-                emit(
-                    "research",
-                    f"Track {index} returned {len(results)} results; added {added} new sources.",
-                    "complete",
-                )
+                    futures.append(
+                        (index, track, executor.submit(
+                            self.search.search, f"{topic} {track}", max_results=3
+                        ))
+                    )
+
+                sources = []
+                seen = set()
+                for index, track, future in futures:
+                    results = future.result()
+                    added = 0
+                    for item in results:
+                        url = item.get("url", "").strip()
+                        if not url or url in seen:
+                            continue
+                        seen.add(url)
+                        domain = urlparse(url).netloc
+                        sources.append(
+                            {
+                                "id": f"S{len(sources) + 1}",
+                                "title": item.get("title") or domain or "Untitled source",
+                                "url": url,
+                                "snippet": item.get("content", "")[:1200],
+                                "domain": domain,
+                                "quality": "Search result · verify before citation",
+                                "track": track,
+                            }
+                        )
+                        added += 1
+                    emit(
+                        "research",
+                        f"Track {index} returned {len(results)} results; added {added} new sources.",
+                        "complete",
+                    )
             if not sources:
                 raise RuntimeError(
                     "Search returned no usable sources. Try a narrower question or check Tavily."
@@ -263,6 +307,18 @@ class ResearchOrchestrator:
             )
             return result
         return operation
+
+    @staticmethod
+    def _preview(value, limit: int = 1600) -> str:
+        rendered = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+        return rendered[:limit] + ("…" if len(rendered) > limit else "")
+
+    @staticmethod
+    def _source_manifest(sources: list[dict]) -> list[dict]:
+        return [
+            {"id": source["id"], "title": source["title"], "domain": source["domain"]}
+            for source in sources
+        ]
 
     @staticmethod
     def _evidence_text(sources: list[dict]) -> str:
