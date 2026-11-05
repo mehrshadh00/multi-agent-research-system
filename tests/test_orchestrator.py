@@ -61,7 +61,7 @@ def test_pipeline_emits_live_events_and_deduplicates_sources():
     assert emitted == result["events"]
     assert emitted[0]["status"] == "running"
     assert any("Searching track 1/2" in event["message"] for event in emitted)
-    assert emitted[-1]["agent"] == "Citation Validator"
+    assert emitted[-1]["agent"] == "Evidence Grounding Auditor"
 
 
 def test_pipeline_reports_unknown_and_uncited_citations():
