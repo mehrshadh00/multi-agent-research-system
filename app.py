@@ -122,7 +122,8 @@ def progress_for_event(event):
 
 
 run_store = SQLiteRunStore()
-\nwith st.sidebar:
+
+with st.sidebar:
     st.markdown("## ✳ AETHER")
     st.caption("MULTI-AGENT RESEARCH STUDIO")
     if "aether_mode" not in st.session_state:
