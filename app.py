@@ -8,7 +8,9 @@ import streamlit as st
 
 from research_studio.config import settings
 from research_studio.demo import demo_result
-from research_studio.orchestrator import ResearchOrchestrator
+from research_studio.orchestrator import ResearchOrchestrator, ResearchStageError
+from research_studio.state import STAGE_LABELS, STAGE_ORDER
+from research_studio.store import SQLiteRunStore
 
 st.set_page_config(page_title="Aether Research Studio", page_icon="✳", layout="wide")
 st.markdown(
@@ -119,10 +121,52 @@ def progress_for_event(event):
     return 0.96
 
 
+run_store = SQLiteRunStore()
+
 with st.sidebar:
     st.markdown("## ✳ AETHER")
     st.caption("MULTI-AGENT RESEARCH STUDIO")
-    mode = st.radio("Execution mode", ["Guided Demo", "Live Research"])
+    if "aether_mode" not in st.session_state:
+        st.session_state["aether_mode"] = "Guided Demo"
+    if "aether_topic_input" not in st.session_state:
+        st.session_state["aether_topic_input"] = ""
+    if "aether_depth" not in st.session_state:
+        st.session_state["aether_depth"] = "Standard"
+    if "aether_audience" not in st.session_state:
+        st.session_state["aether_audience"] = "Researchers"
+    mode = st.radio("Execution mode", ["Guided Demo", "Live Research"], key="aether_mode")
+    failed_runs = [run for run in run_store.list_runs() if run["status"] == "failed"]
+    if failed_runs:
+        st.divider()
+        st.markdown("**Recover a failed mission**")
+        run_ids = [""] + [run["run_id"] for run in failed_runs]
+        selected_run = st.selectbox(
+            "Saved failed runs",
+            run_ids,
+            format_func=lambda run_id: (
+                "Choose a run…" if not run_id else
+                next((f"{run['topic'][:38]} · {run['run_id'][:7]}" for run in failed_runs if run["run_id"] == run_id), run_id)
+            ),
+        )
+        if selected_run:
+            saved = run_store.load(selected_run)
+            failed_stage = next(
+                (name for name in STAGE_ORDER if saved["stages"][name]["status"] == "failed"),
+                None,
+            )
+            if failed_stage:
+                st.caption(f"Failed at: {STAGE_LABELS[failed_stage]}")
+                if st.button("↻ Resume from failed stage", use_container_width=True):
+                    st.session_state["aether_resume_request"] = {
+                        "run_id": selected_run,
+                        "stage": failed_stage,
+                        "inputs": saved["inputs"],
+                    }
+                    st.session_state["aether_topic_input"] = saved["inputs"]["topic"]
+                    st.session_state["aether_depth"] = saved["inputs"]["depth"]
+                    st.session_state["aether_audience"] = saved["inputs"]["audience"]
+                    st.session_state["aether_mode"] = "Live Research"
+                    st.rerun()
     st.divider()
     st.markdown("**System readiness**")
     st.write("OpenAI · " + ("🟢 configured" if settings.openai_api_key else "⚪ missing"))
@@ -137,23 +181,26 @@ with left:
         "RESEARCH QUESTION",
         placeholder="How are multimodal AI agents changing scientific discovery?",
         height=95,
+        key="aether_topic_input",
     )
 with right:
     depth = st.select_slider(
         "RESEARCH DEPTH",
         ["Quick scan", "Standard", "Deep dive"],
-        value="Standard",
+        key="aether_depth",
     )
     audience = st.selectbox(
         "REPORT AUDIENCE",
         ["Technical leadership", "General audience", "Researchers", "Product & strategy teams"],
+        key="aether_audience",
     )
 launch = st.button("✳  Launch research mission", type="primary", use_container_width=True)
 st.markdown("### The research pipeline")
 pipeline()
 agent_cards()
 
-if launch:
+resume_request = st.session_state.pop("aether_resume_request", None)
+if launch or resume_request:
     if not topic.strip():
         st.warning("Enter a research question.")
     elif mode == "Live Research" and (
@@ -224,12 +271,19 @@ if launch:
             result["events"] = trace_events
         else:
             try:
-                result = ResearchOrchestrator(settings).run(
+                result = ResearchOrchestrator(settings, store=run_store).run(
                     topic.strip(),
                     depth,
                     audience,
                     on_event=render_event,
+                    run_id=resume_request["run_id"] if resume_request else None,
+                    resume_from=resume_request["stage"] if resume_request else None,
                 )
+            except ResearchStageError as exc:
+                status_box.update(label=f"Mission paused · {STAGE_LABELS[exc.stage]} failed", state="error")
+                st.error(str(exc))
+                st.info(f"Run ID: {exc.run_id}. Use the recovery control in the sidebar to retry this stage.")
+                result = None
             except (RuntimeError, ValueError) as exc:
                 status_box.update(label="Mission failed", state="error")
                 st.error(str(exc))
@@ -248,6 +302,19 @@ result = st.session_state.get("aether_result")
 if result:
     st.markdown("---")
     st.markdown("## Mission control")
+    if result.get("run_id"):
+        st.caption(f"RUN ID · {result['run_id']}")
+        st.markdown("**Checkpoint status**")
+        stage_cols = st.columns(3)
+        for index, stage_name in enumerate(STAGE_ORDER):
+            stage = result["stages"][stage_name]
+            with stage_cols[index % 3]:
+                st.write(f"**{STAGE_LABELS[stage_name]}**")
+                st.caption(
+                    f"{stage['status'].upper()} · {stage['attempts']} attempt(s)"
+                )
+                if stage.get("error"):
+                    st.error(stage["error"])
     cols = st.columns(4)
     metrics = [
         len(result["sources"]),

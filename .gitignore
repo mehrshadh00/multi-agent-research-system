@@ -7,3 +7,4 @@ venv/
 .env
 .streamlit/secrets.toml
 .DS_Store
+.aether_data/
