@@ -15,6 +15,11 @@ The Streamlit dashboard displays agent state changes and activity events while t
 ## Important architectural distinction
 The current release is a **sequential, role-based multi-agent workflow**. The roles use a shared LLM provider with different instructions; they are not independent concurrent agents, and the critic is not a formal verification system. This keeps the execution trace understandable while the workflow is being hardened.
 
+## Checkpointed execution (v0.3)
+Each live run is saved to a local SQLite database at `.aether_data/aether.sqlite3`. Every stage transition and successful stage output is committed as a checkpoint. If a provider fails, the run is marked failed and the dashboard offers a **Resume from failed stage** action. Completed earlier stages are restored from SQLite and are not called again; the selected failed stage and all downstream stages are rerun.
+
+The six checkpointed stages are planning, research, audit, synthesis, citation validation, and evidence grounding. Attempt counts, timestamps, errors, and run events are stored with each run. The store is local to the app filesystem; on ephemeral hosting such as a restarted Streamlit Community Cloud container, local SQLite data may be lost. Use a persistent volume or managed database before relying on long-term run history.
+
 ## Architecture
 `Streamlit UI → ResearchOrchestrator → Planner → Track-by-track Tavily Search → Critic → Writer → Citation ID Validator → Claim Grounding Auditor`
 
@@ -59,7 +64,7 @@ Tests use fake providers for deterministic orchestration checks; they do not con
 
 ## Engineering roadmap
 - Stronger claim segmentation and independently corroborated evidence checks.
-- Retry policies, provider timeouts, structured outputs, and failure recovery.
-- Replayable run traces and run history.
+- Distributed task execution, provider-specific retry/backoff policies, and structured outputs.
+- Persistent run history across deployments and interactive trace replay.
 - Independent agent configuration and optional LangGraph state machine.
 - Contradiction detection, richer source quality signals, and PDF/DOCX export.
