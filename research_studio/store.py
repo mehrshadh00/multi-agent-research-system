@@ -39,7 +39,7 @@ class SQLiteRunStore:
     def save(self, state: dict) -> None:
         now = utc_now()
         state["updated_at"] = now
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 """
                 INSERT INTO research_runs
