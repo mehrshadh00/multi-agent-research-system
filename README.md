@@ -8,6 +8,7 @@
 3. **Fact & Bias Auditor** reviews the collected search snippets for gaps, limitations, potential bias, and contradictions.
 4. **Synthesis Writer** drafts a structured report using the supplied evidence and source IDs.
 5. **Citation Validator** checks whether report citation IDs exist in the retrieved source register and flags uncited sources.
+6. **Evidence Grounding Auditor** performs an advisory, claim-level review of cited report lines against the associated search snippets.
 
 The Streamlit dashboard displays agent state changes and activity events while the live workflow is running. The orchestration callback is UI-agnostic and can later feed a CLI, websocket, or persisted event log.
 
