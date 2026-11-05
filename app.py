@@ -354,6 +354,6 @@ if result:
             )
             st.write(event["message"])
     st.caption(
-        "Search snippets are not full-page verification. Generated conclusions require "
-        "human review; citation ID validation is not source-grounding verification."
+        "Search snippets are not full-page verification. The grounding audit is advisory, "
+        "not independent verification; human review remains essential."
     )
