@@ -49,3 +49,13 @@ def test_grounding_auditor_skips_reports_without_valid_citations():
     result = audit_claim_grounding("A claim [S99].", SOURCES, GroundingLLM("not json"))
     assert result["status"] == "no_cited_claims"
     assert result["assessments"] == []
+
+
+def test_grounding_auditor_degrades_gracefully_when_provider_fails():
+    class FailingLLM:
+        def complete(self, system, user):
+            raise TimeoutError("provider timeout")
+
+    result = audit_claim_grounding("A claim [S1].", SOURCES, FailingLLM())
+    assert result["status"] == "unavailable"
+    assert "TimeoutError" in result["error"]
