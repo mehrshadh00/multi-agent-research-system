@@ -65,7 +65,7 @@ def test_pipeline_emits_live_events_and_deduplicates_sources(tmp_path):
     assert [source["id"] for source in result["sources"]] == ["S1", "S2"]
     assert emitted == result["events"]
     assert emitted[0]["status"] == "running"
-    assert any("Searching track 1/2" in event["message"] for event in emitted)
+    assert any("Dispatching track 1/2" in event["message"] for event in emitted)
     assert emitted[-1]["agent"] == "Evidence Grounding Auditor"
 
 
