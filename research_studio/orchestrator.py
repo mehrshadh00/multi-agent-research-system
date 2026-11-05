@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from .agents import profile_for
 from .grounding import audit_claim_grounding
-from .providers import LLMProvider, SearchProvider
+from .providers import create_llm_provider, create_search_provider
 from .state import STAGE_LABELS, new_run_state, reset_from
 from .store import SQLiteRunStore
 
@@ -28,10 +28,8 @@ class ResearchOrchestrator:
     """Checkpointed planner → researcher → auditor → writer workflow."""
 
     def __init__(self, settings, search_provider=None, llm_provider=None, store=None):
-        self.search = search_provider or SearchProvider(settings.tavily_api_key)
-        self.llm = llm_provider or LLMProvider(
-            settings.openai_api_key, settings.openai_model
-        )
+        self.search = search_provider or create_search_provider(settings)
+        self.llm = llm_provider or create_llm_provider(settings)
         self.store = store or SQLiteRunStore()
 
     def run(
