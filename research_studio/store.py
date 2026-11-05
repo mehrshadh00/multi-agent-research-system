@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,7 +17,7 @@ class SQLiteRunStore:
     def __init__(self, path: str | Path = ".aether_data/aether.sqlite3"):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS research_runs (
@@ -61,7 +62,7 @@ class SQLiteRunStore:
             )
 
     def load(self, run_id: str) -> dict | None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT state_json FROM research_runs WHERE run_id = ?",
                 (run_id,),
@@ -69,7 +70,7 @@ class SQLiteRunStore:
         return json.loads(row["state_json"]) if row else None
 
     def list_runs(self, limit: int = 20) -> list[dict]:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             rows = connection.execute(
                 """
                 SELECT run_id, topic, status, created_at, updated_at
